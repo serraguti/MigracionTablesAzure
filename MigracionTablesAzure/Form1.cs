@@ -7,6 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Configuration;
+using Microsoft.Azure.Cosmos.Table;
+using System.IO;
+using System.Xml.Linq;
 
 namespace MigracionTablesAzure
 {
@@ -15,6 +19,36 @@ namespace MigracionTablesAzure
         public Form1()
         {
             InitializeComponent();
+        }
+
+        private void botonmigrardatos_Click(object sender, EventArgs e)
+        {
+            String keys =
+                 ConfigurationSettings.AppSettings["storageaccountkey"];
+            CloudStorageAccount account =
+                CloudStorageAccount.Parse(keys);
+            CloudTableClient client = account.CreateCloudTableClient();
+            CloudTable tabla = client.GetTableReference("tablaalumnos");
+            tabla.CreateIfNotExists();
+            Stream content =
+                this.GetType().Assembly.GetManifestResourceStream
+                ("MigracionTablesAzure.alumnos_tables_storage.xml");
+            XDocument docxml = XDocument.Load(content);
+            var consulta = from datos in docxml.Descendants("alumno")
+                           select new Alumno
+                           {
+                                IdAlumno = datos.Element("idalumno").Value,
+                                Nombre = datos.Element("nombre").Value,
+                                Curso = datos.Element("curso").Value,
+                                Apellidos = datos.Element("apellidos").Value,
+                                Nota = datos.Element("nota").Value
+                           };
+            foreach (Alumno alum in consulta)
+            {
+                TableOperation insert = TableOperation.Insert(alum);
+                tabla.Execute(insert);
+            }
+            this.lblmensaje.Text = "Todo OK";
         }
     }
 }
